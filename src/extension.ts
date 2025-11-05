@@ -35,18 +35,42 @@ function createTranslatorPanel(context: vscode.ExtensionContext) {
     // 处理来自 WebView 的消息
     translatorPanel.webview.onDidReceiveMessage(
         async (message: { command: string; text?: string; fromLang?: string; toLang?: string }) => {
-            switch (message.command) {
-                case 'translate':
-                    if (message.text && message.fromLang && message.toLang) {
-                        await handleTranslate(message.text, message.fromLang, message.toLang);
-                    }
-                    break;
-                case 'copy':
-                    if (message.text) {
-                        await vscode.env.clipboard.writeText(message.text);
-                        vscode.window.showInformationMessage('已复制到剪贴板');
-                    }
-                    break;
+            console.log('收到 WebView 消息:', message);
+            try {
+                switch (message.command) {
+                    case 'translate':
+                        if (message.text && message.fromLang && message.toLang) {
+                            console.log('开始翻译:', message.text, message.fromLang, message.toLang);
+                            await handleTranslate(message.text, message.fromLang, message.toLang);
+                            // 发送确认消息回 WebView
+                            translatorPanel?.webview.postMessage({
+                                command: 'translateStarted',
+                                text: '翻译请求已发送'
+                            });
+                        } else {
+                            console.error('翻译参数不完整:', message);
+                            vscode.window.showErrorMessage('翻译参数不完整');
+                        }
+                        break;
+                    case 'copy':
+                        if (message.text) {
+                            await vscode.env.clipboard.writeText(message.text);
+                            vscode.window.showInformationMessage('已复制到剪贴板');
+                            translatorPanel?.webview.postMessage({
+                                command: 'copySuccess'
+                            });
+                        }
+                        break;
+                    default:
+                        console.warn('未知的命令:', message.command);
+                }
+            } catch (error) {
+                console.error('处理消息时出错:', error);
+                vscode.window.showErrorMessage(`处理消息失败: ${error}`);
+                translatorPanel?.webview.postMessage({
+                    command: 'error',
+                    text: String(error)
+                });
             }
         },
         undefined,
@@ -405,6 +429,9 @@ function getWebviewContent(context: vscode.ExtensionContext): string {
     <script>
         const vscode = acquireVsCodeApi();
         
+        // 调试：检查元素是否存在
+        console.log('初始化 WebView...');
+        
         const inputText = document.getElementById('inputText');
         const outputText = document.getElementById('outputText');
         const translateBtn = document.getElementById('translateBtn');
@@ -416,7 +443,25 @@ function getWebviewContent(context: vscode.ExtensionContext): string {
         const statusText = document.getElementById('statusText');
         const loading = document.getElementById('loading');
         
+        // 检查所有元素是否存在
+        if (!inputText || !outputText || !translateBtn || !clearBtn || !copyInputBtn || !copyOutputBtn || !fromLang || !toLang || !statusText || !loading) {
+            console.error('元素未找到:', {
+                inputText: !!inputText,
+                outputText: !!outputText,
+                translateBtn: !!translateBtn,
+                clearBtn: !!clearBtn,
+                copyInputBtn: !!copyInputBtn,
+                copyOutputBtn: !!copyOutputBtn,
+                fromLang: !!fromLang,
+                toLang: !!toLang,
+                statusText: !!statusText,
+                loading: !!loading
+            });
+        }
+        
+        // 翻译按钮点击事件
         translateBtn.addEventListener('click', () => {
+            console.log('翻译按钮被点击');
             const text = inputText.value.trim();
             if (!text) {
                 statusText.textContent = '请输入要翻译的文本';
@@ -426,12 +471,23 @@ function getWebviewContent(context: vscode.ExtensionContext): string {
             statusText.textContent = '正在触发 Cursor Composer...';
             loading.classList.add('active');
             
-            vscode.postMessage({
+            const translateData = {
                 command: 'translate',
                 text: text,
                 fromLang: fromLang.value,
                 toLang: toLang.value
-            });
+            };
+            
+            console.log('发送翻译消息:', translateData);
+            
+            try {
+                vscode.postMessage(translateData);
+                console.log('消息已发送');
+            } catch (error) {
+                console.error('发送消息失败:', error);
+                statusText.textContent = '发送失败: ' + error;
+                return;
+            }
             
             // 显示提示信息
             const fromLangValue = fromLang.value;
@@ -461,28 +517,47 @@ function getWebviewContent(context: vscode.ExtensionContext): string {
             }, 1000);
         });
         
+        // 清空按钮
         clearBtn.addEventListener('click', () => {
+            console.log('清空按钮被点击');
             inputText.value = '';
             outputText.textContent = '翻译结果将显示在这里...';
             statusText.textContent = '已清空';
         });
         
+        // 复制输入按钮
         copyInputBtn.addEventListener('click', () => {
+            console.log('复制输入按钮被点击');
             const text = inputText.value;
             if (text) {
-                vscode.postMessage({ command: 'copy', text: text });
+                try {
+                    vscode.postMessage({ command: 'copy', text: text });
+                    statusText.textContent = '已复制输入内容';
+                } catch (error) {
+                    console.error('复制失败:', error);
+                    statusText.textContent = '复制失败';
+                }
             }
         });
         
+        // 复制输出按钮
         copyOutputBtn.addEventListener('click', () => {
+            console.log('复制输出按钮被点击');
             const text = outputText.textContent;
             if (text && text !== '翻译结果将显示在这里...') {
-                vscode.postMessage({ command: 'copy', text: text });
+                try {
+                    vscode.postMessage({ command: 'copy', text: text });
+                    statusText.textContent = '已复制翻译结果';
+                } catch (error) {
+                    console.error('复制失败:', error);
+                    statusText.textContent = '复制失败';
+                }
             }
         });
         
         // 监听来自扩展的消息
         window.addEventListener('message', event => {
+            console.log('收到扩展消息:', event.data);
             const message = event.data;
             switch (message.command) {
                 case 'updateTranslation':
@@ -490,8 +565,21 @@ function getWebviewContent(context: vscode.ExtensionContext): string {
                     statusText.textContent = '翻译完成';
                     loading.classList.remove('active');
                     break;
+                case 'translateStarted':
+                    statusText.textContent = message.text || '翻译请求已发送';
+                    break;
+                case 'copySuccess':
+                    statusText.textContent = '已复制到剪贴板';
+                    break;
+                case 'error':
+                    statusText.textContent = '错误: ' + message.text;
+                    loading.classList.remove('active');
+                    console.error('扩展错误:', message.text);
+                    break;
             }
         });
+        
+        console.log('WebView 初始化完成');
     </script>
 </body>
 </html>`;
