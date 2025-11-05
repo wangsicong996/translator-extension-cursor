@@ -430,6 +430,8 @@ function getWebviewContent(context: vscode.ExtensionContext): string {
             });
             
             // 显示提示信息
+            const fromLangValue = fromLang.value;
+            const displayText = text;
             outputText.innerHTML = \`
                 <div style="color: var(--vscode-textLink-foreground);">
                     ⚡ 翻译请求已发送到 Cursor Composer-1
@@ -444,8 +446,8 @@ function getWebviewContent(context: vscode.ExtensionContext): string {
                 </div>
                 <br>
                 <div style="font-family: monospace; background: var(--vscode-textCodeBlock-background); padding: 8px; border-radius: 4px; margin-top: 8px;">
-                    原文 (${fromLang.value}):<br>
-                    ${text.replace(/\n/g, '<br>')}
+                    原文 (\${fromLangValue}):<br>
+                    \${displayText.replace(/\n/g, '<br>')}
                 </div>
             \`;
             
@@ -492,3 +494,4 @@ function getWebviewContent(context: vscode.ExtensionContext): string {
 }
 
 export function deactivate() {}
+
