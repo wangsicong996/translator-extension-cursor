@@ -22,8 +22,24 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: translator-extension/package-lock.json
+      
+    - name: Generate package-lock.json if not exists
+      working-directory: ./translator-extension
+      run: |
+        if [ ! -f package-lock.json ]; then
+          echo "package-lock.json not found, generating it..."
+          npm install --package-lock-only
+        else
+          echo "package-lock.json exists, skipping generation"
+        fi
+        
+    - name: Cache npm dependencies
+      uses: actions/cache@v4
+      with:
+        path: translator-extension/node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('translator-extension/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
         
     - name: Install dependencies
       working-directory: ./translator-extension
