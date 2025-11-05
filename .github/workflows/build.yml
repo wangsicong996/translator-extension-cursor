@@ -23,8 +23,29 @@ jobs:
       with:
         node-version: '18'
       
+    - name: Find translator-extension directory
+      id: find_dir
+      run: |
+        if [ -d "translator-extension" ]; then
+          echo "dir=translator-extension" >> $GITHUB_OUTPUT
+          echo "Found translator-extension directory"
+        elif [ -f "translator-extension/package.json" ]; then
+          echo "dir=translator-extension" >> $GITHUB_OUTPUT
+          echo "Found translator-extension/package.json"
+        else
+          # 检查根目录是否有 package.json（可能是仓库根目录就是扩展目录）
+          if [ -f "package.json" ]; then
+            echo "dir=." >> $GITHUB_OUTPUT
+            echo "Found package.json in root, using root directory"
+          else
+            echo "Error: translator-extension directory not found"
+            ls -la
+            exit 1
+          fi
+        fi
+      
     - name: Generate package-lock.json if not exists
-      working-directory: ./translator-extension
+      working-directory: ./${{ steps.find_dir.outputs.dir }}
       run: |
         if [ ! -f package-lock.json ]; then
           echo "package-lock.json not found, generating it..."
@@ -36,24 +57,25 @@ jobs:
     - name: Cache npm dependencies
       uses: actions/cache@v4
       with:
-        path: translator-extension/node_modules
-        key: ${{ runner.os }}-node-${{ hashFiles('translator-extension/package-lock.json') }}
+        path: ${{ steps.find_dir.outputs.dir }}/node_modules
+        key: ${{ runner.os }}-node-${{ steps.find_dir.outputs.dir }}-${{ hashFiles('translator-extension/package-lock.json', 'package-lock.json') }}
         restore-keys: |
+          ${{ runner.os }}-node-${{ steps.find_dir.outputs.dir }}-
           ${{ runner.os }}-node-
         
     - name: Install dependencies
-      working-directory: ./translator-extension
+      working-directory: ./${{ steps.find_dir.outputs.dir }}
       run: npm ci
       
     - name: Compile TypeScript
-      working-directory: ./translator-extension
+      working-directory: ./${{ steps.find_dir.outputs.dir }}
       run: npm run compile
       
     - name: Install VS Code Extension Manager
       run: npm install -g @vscode/vsce
       
     - name: Package extension
-      working-directory: ./translator-extension
+      working-directory: ./${{ steps.find_dir.outputs.dir }}
       run: vsce package --no-yarn
       continue-on-error: true
       
@@ -61,7 +83,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: cursor-translator-${{ github.sha }}
-        path: translator-extension/*.vsix
+        path: ${{ steps.find_dir.outputs.dir }}/*.vsix
         retention-days: 30
         if-no-files-found: ignore
         
@@ -69,7 +91,7 @@ jobs:
       if: github.event_name == 'release'
       uses: softprops/action-gh-release@v1
       with:
-        files: translator-extension/*.vsix
+        files: ${{ steps.find_dir.outputs.dir }}/*.vsix
         draft: false
         prerelease: false
         generate_release_notes: true
