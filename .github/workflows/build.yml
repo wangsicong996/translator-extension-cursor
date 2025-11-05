@@ -21,7 +21,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
       
     - name: Find translator-extension directory
       id: find_dir
@@ -72,11 +72,11 @@ jobs:
       run: npm run compile
       
     - name: Install VS Code Extension Manager
-      run: npm install -g @vscode/vsce
+      run: npm install -g @vscode/vsce@latest
       
     - name: Package extension
       working-directory: ./${{ steps.find_dir.outputs.dir }}
-      run: vsce package --no-yarn
+      run: npx @vscode/vsce package --no-yarn
       continue-on-error: true
       
     - name: Upload build artifact
