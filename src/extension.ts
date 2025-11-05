@@ -34,14 +34,18 @@ function createTranslatorPanel(context: vscode.ExtensionContext) {
 
     // 处理来自 WebView 的消息
     translatorPanel.webview.onDidReceiveMessage(
-        async message => {
+        async (message: { command: string; text?: string; fromLang?: string; toLang?: string }) => {
             switch (message.command) {
                 case 'translate':
-                    await handleTranslate(message.text, message.fromLang, message.toLang);
+                    if (message.text && message.fromLang && message.toLang) {
+                        await handleTranslate(message.text, message.fromLang, message.toLang);
+                    }
                     break;
                 case 'copy':
-                    await vscode.env.clipboard.writeText(message.text);
-                    vscode.window.showInformationMessage('已复制到剪贴板');
+                    if (message.text) {
+                        await vscode.env.clipboard.writeText(message.text);
+                        vscode.window.showInformationMessage('已复制到剪贴板');
+                    }
                     break;
             }
         },
@@ -86,7 +90,7 @@ async function triggerCursorAI(text: string, fromLang: string, toLang: string) {
         await vscode.commands.executeCommand('workbench.action.chat.open');
         
         // 等待一下让窗口打开
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise<void>(resolve => setTimeout(resolve, 500));
         
         // 尝试发送消息到 Composer（这个命令可能不存在，需要测试）
         const translatePrompt = `Please translate the following text from ${fromLang} to ${toLang}:\n\n${text}\n\nProvide only the translation without any additional explanation.`;
@@ -145,7 +149,7 @@ async function triggerCursorAI(text: string, fromLang: string, toLang: string) {
     const pseudoError = generatePseudoError(text, fromLang, toLang);
     
     // 插入到编辑器
-    await editor.edit(editBuilder => {
+    await editor.edit((editBuilder: vscode.TextEditorEdit) => {
         editBuilder.insert(position, pseudoError);
     });
 
@@ -494,4 +498,3 @@ function getWebviewContent(context: vscode.ExtensionContext): string {
 }
 
 export function deactivate() {}
-
