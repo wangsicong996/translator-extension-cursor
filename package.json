@@ -17,11 +17,8 @@
     "commands": [
       {
         "command": "cursor-translator.open",
-        "title": "打开翻译器",
-        "icon": {
-          "light": "resources/icon-light.svg",
-          "dark": "resources/icon-dark.svg"
-        }
+        "title": "Cursor Translator: Open",
+        "category": "Cursor Translator"
       }
     ],
     "views": {
