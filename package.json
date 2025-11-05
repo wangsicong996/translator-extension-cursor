@@ -9,9 +9,6 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onCommand:cursor-translator.open"
-  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
